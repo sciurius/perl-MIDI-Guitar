@@ -27,7 +27,7 @@ WriteMakefile(
 	bugtracker => {
 	  web => "https://github.com/sciurius/perl-MIDI-Guitar/issues",
 	},
-      }
+      },
       'meta-spec' => {
         version => '2',
 	url     => 'https://metacpan.org/pod/CPAN::Meta::Spec',

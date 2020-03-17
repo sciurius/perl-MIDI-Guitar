@@ -316,7 +316,7 @@ sub strum {
 		push( @p, @ev );
 	    }
 	}
-	push( @pattern, $disp ? \@p : [ $offset, \@p ] );
+	push( @pattern, $disp ? @p : [ $offset, \@p ] );
     }
     # Bless it, so we can check its type.
     bless \@pattern => 'MIDI::Guitar::Pattern';
