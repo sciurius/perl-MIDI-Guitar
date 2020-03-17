@@ -1,5 +1,9 @@
 Revision history for MIDI-Guitar
 
+0.03	2020-03-17
+
+	Added volume(), cresc() and test.
+
 0.02	2020-03-17
 
 	Updated documentation,

@@ -31,9 +31,13 @@ strings (chords) using these patterns. It sounds like a real plucked
 instrument, which implies that strings keep sounding until played or
 explicitly muted.
 
-You can change tempo, slow down and accelerate.
+You can change tempo, slow down (ritardante) and accelerate.
+
+You can change volume, instantaneously or gradually (de/crescendo).
 
 Timing and volumes can be made varying for a more lively feeling.
+
+It understands ASCII guitar tablature.
 
 ## INSTALLATION
 

@@ -41,6 +41,28 @@ guitar sounds.
     $opus->play( $s1 => $E  );
     $opus->finish( file => 'x.midi' );
 
+Interesting features:
+
+=over 4
+
+=item *
+
+Randomisation to make the sound more realistic.
+
+=item *
+
+Tempo changes, including gradual changes over multiple measures (ritardante).
+
+=item *
+
+Volume changes, including gradual changes over multiple measures (de/crescendo).
+
+=item *
+
+Playback from ASCII guitar tablature.
+
+=back
+
 =cut
 
 use Carp;
@@ -106,6 +128,7 @@ sub new {
 		 bpm     => 100,
 		 instr   => 'Acoustic Guitar(nylon)',
 		 strings => 'E2 A2 D3 G3 B3 E4',
+		 volume  => 1,
 	       );
     $self->init( %args, @_);
     return $self;
@@ -180,6 +203,9 @@ sub init {
     $self->{patch} = $args{instr};
     $self->{patch} = $MIDI::patch2number{$self->{patch}} ||
       croak("Unknown MIDI instrument: $args{instr}");
+
+    # Volume.
+    $self->{volume} = $args{volume} || 1;
 
     # Randomizers.
     $self->{rtime} = $args{rtime} || 0;
@@ -466,6 +492,46 @@ sub tab {
     return $self;
 }
 
+=head2 $opus->volume( $volume )
+
+With an argument: sets the volume scaling.
+
+Default scaling is 1.
+
+Returns the old scaling.
+
+=cut
+
+sub volume {
+    my ( $self, $vol ) = @_;
+    my $v = $self->{volume};
+    $self->{volume} = $vol if @_ > 1;
+    return $v;
+}
+
+=head2 $opus->cresc( $amt, $measures )
+
+Modifies the volume in equal steps over the indicated number of measures.
+
+Mostly used for crescendo / decrescendo.
+
+For example, to decresc to 60% over 3 measures:
+
+    $opus->cresc( 0.6, 3 );
+
+=cut
+
+my $cresc;
+sub cresc {
+    my ( $self, $amt, $bars ) = @_;
+    my $v0 = $self->{volume};
+    my $v1 = $amt * $v0;
+    my $c0 = $self->{clock} - $self->{tpb};
+    my $c1 = $c0 + ( $bars * $self->{bpm} * $self->{tpb} );
+    $cresc = [ $c0, $v0, $c1, $v1 ];
+    return $self;
+}
+
 =head2 $opus->tempo( $tempo )
 
 Sets the tempo (beats per minute).
@@ -608,6 +674,25 @@ sub DESTROY {
 
 sub note {
     my ( $self, $clock, $note, $velocity ) = @_;
+
+    # Handle crescendo.
+    if ( $cresc && $clock >= $cresc->[2] ) {
+	# Reached final volume.
+	$self->{volume} = $cresc->[3];
+	undef $cresc;
+    }
+    if ( $cresc && $clock >= $cresc->[0] ) {
+	my @c = @$cresc;
+	$self->{volume} = $c[1] +
+	  ( ( $c[3] - $c[1] ) / ( $c[2] - $c[0] ) ) * ( $clock - $c[0] );
+    }
+
+    # Handle velocity.
+    $velocity *= $self->{volume};
+    if ( $velocity > 127 ) {
+	$velocity = 127;
+    }
+
     push( @{ $self->{events} },
 	  [ $velocity > 0 ? 'note_on' : 'note_off',
 	    $clock, $self->{chan}, $note, $velocity ] );

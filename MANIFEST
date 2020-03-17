@@ -4,3 +4,9 @@ Makefile.PL
 README.md
 lib/MIDI/Guitar.pm
 t/00-load.t
+00-load.t
+10-strum.t
+20-pluck.t
+30-tab.t
+80-rit.t
+81-cresc.t
