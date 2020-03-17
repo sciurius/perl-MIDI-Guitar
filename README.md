@@ -10,8 +10,8 @@ guitar sounds.
 
     # A pluck pattern.
     my $p1 = $opus->pluck( '1 5:80',
-		           '2 2-4:80',
-		           '3 4-2:80' );
+                           '2 2-4:80',
+                           '3 4-2:80' );
 
     # A strum pattern.
     my $s1 = $opus->strum( '1 3/6 6:90 1-5:80' );

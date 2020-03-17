@@ -9,7 +9,9 @@ use strict;
 
 MIDI::Guitar - Plucked guitar MIDI
 
-our $VERSION = '0.01';
+=cut
+
+our $VERSION = '0.02';
 
 =head1 SYNOPSIS
 
@@ -80,6 +82,18 @@ use constant MIDI_CHAN_PERCUSSION => 10;
 # @root;			# root notes for strings
 # @sounding;			# strings that sound
 
+=head1 METHODS
+
+=head2 $opus = MIDI::Guitar->new( %args )
+
+Creates a new MIDI::Guitar instance, supplies default values, and
+initialises it with the arguments, if any. This is identical to
+
+    $opus = MIDI::Guitar->new;
+    $opus->init( %args );
+
+=cut
+
 sub new {
     my $pkg = shift;
     my $self = bless {} => $pkg;
@@ -96,6 +110,58 @@ sub new {
     $self->init( %args, @_);
     return $self;
 }
+
+
+=head2 $opus->init( %args )
+
+Initialises a new instance. Possible arguments are:
+
+=over
+
+=item sig
+
+Time signature. This should be a fraction where the denominator is a
+power of 2, e.g. C<4/4> or C<6/8>.
+
+Default is C<4/4>.
+
+=item bpm
+
+Beats per minute.
+
+Default is C<100>.
+
+=item instr
+
+MIDI instrument name. See L<MIDI> for a list of instrument names.
+
+Default is C<Acoustic Guitar(nylon)>.
+
+=item rtime
+
+Time randomizer. Suitable values are 0 .. 10.
+
+=item rvol
+
+Volume randomizer. Suitable values are 0 .. 6.
+
+=item lead
+
+Lead-in and metronome ticks.
+
+If zero, or greater than zero, a metronome tick in included in the MIDI.
+
+A greater than zero value specifies the number of lead-in bars.
+
+TODO A negative value yields lead-in bars but no metronome.
+
+=item midi
+
+The name of the MIDI file to be produced.
+
+=back
+
+=cut
 
 sub init {
     my $self = shift;
@@ -124,15 +190,44 @@ sub init {
     $self->{tpb} = $self->{ticks};
 
     $self->{lead} = $args{lead};
-    if ( defined $self->{lead} && $self->{lead} > 0 ) {
-	$self->{clock} += $self->{lead} * $self->{tpb};
+    if ( defined $self->{lead} && $self->{lead} ) {
+	$self->{clock} += abs($self->{lead}) * $self->{tpb};
     }
     $self->{cskip} = 0;
     @{ $self->{root} } = map { 12+$MIDI::note2number{$_} } split( ' ', $args{strings} );
     @{ $self->{sounding} } = (0) x @{ $self->{root} };
 
+    $self->{midi} = $args{midi};
     return $self;
 }
+
+=head2 $opus->pluck( @actions )
+
+Plucks a measurefull of strings.
+
+Actions are strings (the ones between C<">) each containing a number
+of space separated values.
+
+The first value is the I<time> the action must be taken. The time is
+expressed in fractional beats, C<1.0> is the first beat of a measure,
+C<1.5> is halfway between C<1> and C<2>, and so on.
+
+For triplets use C<1.0>, C<1.333>, and C<1.667>.
+
+C<Actions> are strings (the ones that make music) and volumes. For
+example, C<6:80> plucks string C<6> (on a guitar this is the I<lowest>
+string) with relative volume C<80>. C<2-4:60> plucks strings C<2>,
+C<3>, and C<4> with volume C<60>. C<5,1:70> plucks strings C<5> and
+C<1> with volume C<70>, and so on.
+
+Strings that are not indicated will keep sounding if they have been
+plucked earlier. A volume of zero will mute the string.
+
+See L<examples/risingsun.pl> for an example.
+
+Note that regardless of the actions, pluck() fills a single measure.
+
+=cut
 
 sub pluck {
     my ( $self, @args ) = @_;
@@ -145,6 +240,34 @@ sub pluck {
     }
     return $self->strum(@args);
 }
+
+=head2 $opus->strum( @actions );
+
+Strums a measurefull of strings.
+
+Actions are strings (the ones between C<">) each containing a number
+of space separated values.
+
+The first value is the I<time> the action starts. The time is
+expressed in fractional beats, C<1.0> is the first beat of a measure,
+C<1.5> is halfway between C<1> and C<2>, and so on.
+
+The second value denotes the time distance between the strums. A value
+of C<1> means that the strings will be plucked one beat after another.
+
+It is conventional to denote the distance as a fraction. For example,
+in a C<3/4> time signature, a strum starting at beat C<1> with
+distance C<3/6> will equally distribute 6 plucks over the 3 beats of
+the measure (1.0, 1.5, 2.0, 2.5, 3.0 3.5).
+
+Actions are similar to the ones described for the pluck() method.
+However, order is relevant now. For example, C<6:90 1-5:80> will pluck
+strings 6, 1, 2, 3, 4, 5, in that order. C<6:90 5-1:80> will pluck 6,
+5, 4, 3, 2, and 1.
+
+Note that regardless of the actions, strum() fills a single measure.
+
+=cut
 
 sub strum {
     my ( $self, @args ) = @_;
@@ -165,6 +288,7 @@ sub strum {
 	# Strum displacement is either a float number, or a fraction.
 	$disp = $1/$2 if $disp =~ m;^([-+]?\d+)/(\d+)$;;
 
+	my @p;
 	foreach ( split( ' ', $actions ) ) {
 	    my @ev;
 
@@ -183,19 +307,32 @@ sub strum {
 	    # Strum strings.
 	    if ( $disp ) {
 		foreach ( @ev ) {
-		    push( @pattern, [ $offset, [ $_ ] ] );
+		    push( @p, [ $offset, [ $_ ] ] );
 		    $offset += $disp;
 		}
 	    }
 	    # Displacement zero => pluck all strings.
 	    else {
-		push( @pattern, [ $offset, \@ev ] );
+		push( @p, @ev );
 	    }
 	}
+	push( @pattern, $disp ? \@p : [ $offset, \@p ] );
     }
     # Bless it, so we can check its type.
-    bless \@pattern => 'PlayPattern';
+    bless \@pattern => 'MIDI::Guitar::Pattern';
 }
+
+=head2 $opus->play( $pattern => $strings )
+
+Plays a pattern over the strings.
+
+Pattern is the result from an earlier call to pluck(), strum(), or tab().
+
+Strings is a space separated series of finger positions. The strings
+are played according to the positions. C<0> indicates an open string,
+C<-> a muted string.
+
+=cut
 
 sub play {
     my $self = shift;
@@ -208,8 +345,8 @@ sub play {
 
     my ( $pattern, $strings ) = @_;
 
-    unless ( UNIVERSAL::isa($pattern, 'PlayPattern' ) ) {
-	croak("PlayPattern required");
+    unless ( UNIVERSAL::isa($pattern, 'MIDI::Guitar::Pattern' ) ) {
+	croak("Pattern required");
     }
     unless ( UNIVERSAL::isa($strings, 'ARRAY' ) ) {
 	$strings = [ split(' ', $strings) ];
@@ -241,6 +378,7 @@ sub play {
 		if ( $self->{sounding}->[$str] ) {
 		    $self->note( $cclock, $self->{sounding}->[$str], 0 );
 		}
+		next unless $vel > 0;
 		$self->note( $cclock, $note,
 		      $vel > $self->{rvol} ? $vel + $dv : $vel );
 		$self->{sounding}->[$str] = $vel ? $note : 0;
@@ -250,6 +388,29 @@ sub play {
     }
     $self->{clock} += $self->{bpm} * $self->{tpb};
 }
+
+=head2 $opus->tab( $measures, $data )
+
+WARNING: Experimental method. API is likely to change.
+
+Plays I<measures> of tablature I<data> (see e.g. L<https://en.wikipedia.org/wiki/Tablature#Guitar_tablature>).
+
+Support is still very basic, but interestingly functional.
+
+For example:
+
+    $opus->tab( 4, <<EOD );
+    ------5-7-----7-|8-----8-2-----2-|0---------0-----|----------------|
+    ----5-----5-----|--5-------3-----|--1---1-----1---|--1-1-----------|
+    --5---------5---|----5-------2---|----2---------2-|0-2-2-----------|
+    7-------6-------|5-------4-------|3---------------|----------------|
+    ----------------|----------------|----------------|2-0-0---0---8-7-|
+    ----------------|----------------|----------------|----------------|
+    EOD
+
+See L<examples/stairway.pl> for an example.
+
+=cut
 
 sub tab {
     my ( $self, @args ) = @_;
@@ -305,13 +466,11 @@ sub tab {
     return $self;
 }
 
-sub note {
-    my ( $self, $clock, $note, $velocity ) = @_;
-    push( @{ $self->{events} },
-	  [ $velocity > 0 ? 'note_on' : 'note_off',
-	    $clock, $self->{chan}, $note, $velocity ] );
-    return $self;
-}
+=head2 $opus->tempo( $tempo )
+
+Sets the tempo (beats per minute).
+
+=cut
 
 my @xtempo;
 sub tempo {
@@ -321,6 +480,18 @@ sub tempo {
     $self->{bpmin} = $tempo;
     return $self;
 }
+
+=head2 $opus->rit( $amt, $measures )
+
+Modifies the tempo in equal steps over the indicated number of measures.
+
+Mostly used to slow down (ritenuto, ritardando, hence the name rit()).
+
+For example, to slow down 100bpm to 60bpm over 3 measures:
+
+    $opus->rit( 0.6, 3 );
+
+=cut
 
 sub rit {
     my ( $self, $amt, $bars ) = @_;
@@ -336,8 +507,30 @@ sub rit {
     return $self;
 }
 
+=head2 $opus->finish( %opts )
+
+Finishes the piece and writes the MIDI file (if requested).
+
+Options are:
+
+=over
+
+=item file
+
+Writes the piece to this MIDI file.
+
+The filename can also be specified upon initialisation.
+
+=back
+
+NOTE: If appropriate,  this method is implicitly called upon destruction,
+
+=cut
+
 sub finish {
     my ( $self, %opts ) = @_;
+
+    return unless $self && %$self && defined($self->{events}) && @{$self->{events}};
 
     foreach ( @{ $self->{sounding} } ) {
 	next unless $_;
@@ -370,7 +563,7 @@ sub finish {
 
     my @tracks = ( $ctl, $track );
 
-    if ( defined $self->{lead} ) {
+    if ( defined( my $l = $self->{lead} ) ) {
 	my $tm       =  0;
 	my $chan     =  9;	# 10, reserved for drums
 	my $patch    =  0;	# standard kit
@@ -386,6 +579,7 @@ sub finish {
 		  [  'note_on',  $tm,   $chan, $note, $velocity ],
 		  [  'note_off', $tm+1, $chan, $note, 0         ] );
 	    $tm += $self->{ticks};
+	    last if $l++ == -1;
 	}
 	time2delta(\@mm);
 	push( @tracks, MIDI::Track->new( { events => \@mm } ) );
@@ -395,9 +589,29 @@ sub finish {
 				  ticks => $self->{ticks},
 				  tracks => \@tracks } );
 
+    $opts{file} //= $self->{midi};
     $opus->write_to_file( $opts{file} ) if $opts{file};
 
+    delete $self->{events};
+
     return $opus;
+}
+
+sub DESTROY {
+    my $self = shift;
+    return unless $self && %$self && defined($self->{events}) && @{$self->{events}};
+    $self->finish;
+    delete $self->{events};
+}
+
+################ Helper methods ################
+
+sub note {
+    my ( $self, $clock, $note, $velocity ) = @_;
+    push( @{ $self->{events} },
+	  [ $velocity > 0 ? 'note_on' : 'note_off',
+	    $clock, $self->{chan}, $note, $velocity ] );
+    return $self;
 }
 
 ################ Helpers (non-methods) ################
@@ -480,27 +694,6 @@ play( strum( '1 3/6 6:90 1-5:80'),
     from the 2nd (chord) arg.
 
 
-=head1 EXPORT
-
-A list of functions that can be exported.  You can delete this section
-if you don't export anything, such as for a purely object-oriented module.
-
-=head1 FUNCTIONS
-
-=head2 function1
-
-=cut
-
-sub function1 {
-}
-
-=head2 function2
-
-=cut
-
-sub function2 {
-}
-
 =head1 AUTHOR
 
 Johan Vromans, C<< <JV at cpan.org> >>
@@ -518,6 +711,16 @@ Please report any bugs or feature requests using the issue tracker on
 GitHub.
 
 =head1 ACKNOWLEDGEMENTS
+
+The basics for this module are derived from MMA's Plectrum tracks.
+Admittingly, quite a lot of MMA's Plectrum track stuff is mine :) .
+
+See L<https://www.mellowood.ca/mma/> for information on the MMA
+program. It takes a while to get used to but it's awesome!
+
+=head1 SEE ALSO
+
+L<MIDI>.
 
 =head1 COPYRIGHT & LICENSE
 
