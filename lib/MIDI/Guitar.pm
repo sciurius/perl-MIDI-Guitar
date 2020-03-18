@@ -11,7 +11,7 @@ MIDI::Guitar - Plucked guitar MIDI
 
 =cut
 
-our $VERSION = '0.02';
+our $VERSION = '0.04';
 
 =head1 SYNOPSIS
 
@@ -201,7 +201,7 @@ sub init {
 
     # Instrument. Patch name.
     $self->{patch} = $args{instr};
-    $self->{patch} = $MIDI::patch2number{$self->{patch}} ||
+    $self->{patch} = $MIDI::patch2number{$self->{patch}} //
       croak("Unknown MIDI instrument: $args{instr}");
 
     # Volume.
@@ -229,7 +229,7 @@ sub init {
 
 =head2 $opus->pluck( @actions )
 
-Plucks a measurefull of strings.
+Returns a pattern to pluck a measureful of strings.
 
 Actions are strings (the ones between C<">) each containing a number
 of space separated values.
@@ -269,7 +269,7 @@ sub pluck {
 
 =head2 $opus->strum( @actions );
 
-Strums a measurefull of strings.
+Returns a pattern to strum a measureful of strings.
 
 Actions are strings (the ones between C<">) each containing a number
 of space separated values.
@@ -358,6 +358,8 @@ Strings is a space separated series of finger positions. The strings
 are played according to the positions. C<0> indicates an open string,
 C<-> a muted string.
 
+Returns itself.
+
 =cut
 
 sub play {
@@ -365,7 +367,8 @@ sub play {
 
     unless ( @_ ) {
 	$self->{cskip} += $self->{bpm} * $self->{tpb};
-	return $self->{clock} += $self->{bpm} * $self->{tpb};
+	$self->{clock} += $self->{bpm} * $self->{tpb};
+	return $self;
     }
     $self->{cskip} = 0;
 
@@ -413,6 +416,7 @@ sub play {
 
     }
     $self->{clock} += $self->{bpm} * $self->{tpb};
+    return $self;
 }
 
 =head2 $opus->tab( $measures, $data )
@@ -435,6 +439,8 @@ For example:
     EOD
 
 See L<examples/stairway.pl> for an example.
+
+Returns itself.
 
 =cut
 
@@ -489,6 +495,7 @@ sub tab {
     }
 
     $self->{clock} = $cclock;
+
     return $self;
 }
 
@@ -515,20 +522,21 @@ Modifies the volume in equal steps over the indicated number of measures.
 
 Mostly used for crescendo / decrescendo.
 
+Returns itself.
+
 For example, to decresc to 60% over 3 measures:
 
     $opus->cresc( 0.6, 3 );
 
 =cut
 
-my $cresc;
 sub cresc {
     my ( $self, $amt, $bars ) = @_;
     my $v0 = $self->{volume};
     my $v1 = $amt * $v0;
     my $c0 = $self->{clock} - $self->{tpb};
     my $c1 = $c0 + ( $bars * $self->{bpm} * $self->{tpb} );
-    $cresc = [ $c0, $v0, $c1, $v1 ];
+    $self->{cresc} = [ $c0, $v0, $c1, $v1 ];
     return $self;
 }
 
@@ -536,13 +544,14 @@ sub cresc {
 
 Sets the tempo (beats per minute).
 
+Returns itself.
+
 =cut
 
-my @xtempo;
 sub tempo {
     my ( $self, $tempo, $cclock ) = @_;
     $cclock //= $self->{clock};
-    push( @xtempo, [ $cclock, int(60000000/$tempo) ] );
+    push( @{ $self->{xtempo} }, [ $cclock, int(60000000/$tempo) ] );
     $self->{bpmin} = $tempo;
     return $self;
 }
@@ -552,6 +561,8 @@ sub tempo {
 Modifies the tempo in equal steps over the indicated number of measures.
 
 Mostly used to slow down (ritenuto, ritardando, hence the name rit()).
+
+Returns itself.
 
 For example, to slow down 100bpm to 60bpm over 3 measures:
 
@@ -589,6 +600,8 @@ The filename can also be specified upon initialisation.
 
 =back
 
+Returns the MIDI Opus.
+
 NOTE: If appropriate,  this method is implicitly called upon destruction,
 
 =cut
@@ -615,7 +628,9 @@ sub finish {
 		      ],
 		    );
 
-    push( @ctlevents, [ 'set_tempo', $_->[0], $_->[1] ] ) for @xtempo;
+    if ( my $xtempo = $self->{xtempo} ) {
+	push( @ctlevents, [ 'set_tempo', $_->[0], $_->[1] ] ) for @$xtempo;
+    }
 
     time2delta(\@ctlevents);
     my $ctl = MIDI::Track->new( { events => \@ctlevents } );
@@ -628,6 +643,22 @@ sub finish {
     my $track = MIDI::Track->new( { events => \@{ $self->{events} } } );
 
     my @tracks = ( $ctl, $track );
+
+    if ( $self->{aux} ) {
+	my $ix = 1;
+	foreach ( @{ $self->{aux} } ) {
+	    my $self = $_;
+	    my $ch = $self->{chan} + $ix;
+	    time2delta(\@{ $self->{events} });
+	    push( @tracks, MIDI::Track->new
+		  ( { events =>
+		      [ [ 'track_name', 0, 'Guitar'.$ix ],
+			[ 'patch_change', 0, $ch, $self->{patch} ],
+			map { $_->[EV_CHAN] = $ch; $_ }
+			    @{ $self->{events} } ] } ) );
+	    delete $self->{events};
+	}
+    }
 
     if ( defined( my $l = $self->{lead} ) ) {
 	my $tm       =  0;
@@ -670,16 +701,32 @@ sub DESTROY {
     delete $self->{events};
 }
 
+=head2 $opus->combine( $anotheropus )
+
+Combines another opus with this one.
+
+NOTE: The other opus will be emptied.
+
+=cut
+
+sub combine {
+    my ( $self, $anotheropus ) = @_;
+    push( @{ $self->{aux} }, $anotheropus );
+    return $self;
+}
+
 ################ Helper methods ################
 
 sub note {
     my ( $self, $clock, $note, $velocity ) = @_;
 
     # Handle crescendo.
+    my $cresc = $self->{cresc};
     if ( $cresc && $clock >= $cresc->[2] ) {
 	# Reached final volume.
 	$self->{volume} = $cresc->[3];
 	undef $cresc;
+	delete $self->{cresc};
     }
     if ( $cresc && $clock >= $cresc->[0] ) {
 	my @c = @$cresc;

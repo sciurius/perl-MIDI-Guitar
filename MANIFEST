@@ -10,3 +10,4 @@ t/00-load.t
 30-tab.t
 80-rit.t
 81-cresc.t
+82-combine.t
