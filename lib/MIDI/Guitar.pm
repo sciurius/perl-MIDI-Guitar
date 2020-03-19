@@ -11,7 +11,7 @@ MIDI::Guitar - Plucked guitar MIDI
 
 =cut
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 =head1 SYNOPSIS
 
@@ -93,53 +93,33 @@ use constant MIDI_CHAN_PERCUSSION => 10;
 # $rtime;			# time randomizer
 # $rvol;			# volume randomizer
 # $lead;			# lead in ticks
+# $cskip;			# skip metro on sound out
+# @root;			# root notes for strings
+# @sounding;			# strings that sound
+# @xevents
+# $cresc
 
 # MIDI parameters.
 #
 # $chan;			# MIDI channel
 # $ticks;			# MIDI ticks
 # $clock;			# current
-# $cskip;			# skip metro on sound out
 # @events;			# events for main track
-# @root;			# root notes for strings
-# @sounding;			# strings that sound
 
 =head1 METHODS
 
 =head2 $opus = MIDI::Guitar->new( %args )
 
 Creates a new MIDI::Guitar instance, supplies default values, and
-initialises it with the arguments, if any. This is identical to
+initialises it with the arguments, if any.
 
-    $opus = MIDI::Guitar->new;
-    $opus->init( %args );
-
-=cut
-
-sub new {
-    my $pkg = shift;
-    my $self = bless {} => $pkg;
-
-    # Hardwired for now.
-    $self->{chan} = 0;
-
-    # Defaults.
-    my %args = ( sig     => '4/4',
-		 bpm     => 100,
-		 instr   => 'Acoustic Guitar(nylon)',
-		 strings => 'E2 A2 D3 G3 B3 E4',
-		 volume  => 1,
-	       );
-    $self->init( %args, @_);
-    return $self;
-}
-
-
-=head2 $opus->init( %args )
-
-Initialises a new instance. Possible arguments are:
+Possible arguments are:
 
 =over
+
+=item name
+
+The MIDI track name.
 
 =item sig
 
@@ -159,6 +139,14 @@ Default is C<100>.
 MIDI instrument name. See L<MIDI> for a list of instrument names.
 
 Default is C<Acoustic Guitar(nylon)>.
+
+=item strings
+
+The strings of the instrument, in scientific pitch notation.
+
+Default is common guitar tuning, C<E2 A2 D3 G3 B3 E4>.
+
+Note: There can be any number of strings.
 
 =item rtime
 
@@ -186,14 +174,41 @@ The name of the MIDI file to be produced.
 
 =cut
 
-sub init {
+sub new {
+    my $pkg = shift;
+    my $self = bless {} => $pkg;
+
+    # Hardwired for now.
+    $self->{chan} = 0;
+
+    # Defaults.
+    my %args = ( name    => "Guitar",
+		 sig     => '4/4',
+		 bpm     => 100,
+		 instr   => 'Acoustic Guitar(nylon)',
+		 strings => 'E2 A2 D3 G3 B3 E4',
+		 volume  => 1,
+	       );
+    $self->_init( %args, @_);
+    return $self;
+}
+
+
+=head2 $opus->init( %args )
+
+=cut
+
+sub _init {
     my $self = shift;
     my %args = ( @_ );
+
+    $self->{name} = $args{name} || "Guitar";
 
     # Time signature.
     croak("Invalid time signature: $args{sig}")
       unless $args{sig} =~ m;^(\d+)/(\d)$;;
-    $self->{bpm} = $1;
+    $self->{sig} = $args{sig};
+    $self->{bpm} = $1;		# beats per measure
     $self->{q} = $2;
 
     # Beats per minutes.
@@ -225,6 +240,74 @@ sub init {
 
     $self->{midi} = $args{midi};
     return $self;
+}
+
+=head2 $opus2 = $opus->aux( %args )
+
+Creates an additional instance that can be used just like the
+original, but will be using a different MIDI channel.
+
+The arguments are as with new() and will default to the values of the
+creating instance. In practice, only the following arguments make sense:
+
+=over 2
+
+=item *
+
+name
+
+=item *
+
+instr
+
+=item *
+
+strings
+
+=item *
+
+volume
+
+=item *
+
+rtime
+
+=item *
+
+rvol
+
+=back
+
+=cut
+
+sub aux {
+    my ( $self, %args ) = @_;
+
+    my $opus = bless {} => ref($self);
+    @{$opus}{keys(%$self)} = values(%$self);
+
+    if ( $args{strings} ) {
+	@{ $opus->{root} } = map { 12+$MIDI::note2number{$_} } split( ' ', $args{strings} );
+    }
+    else {
+	$opus->{root} = [ @{ $self->{root} } ];
+    }
+    $opus->{$_} = [] for qw( events xevents );
+    $opus->{sounding} = [ (0) x @{ $opus->{root} } ];
+    $opus->{master} = $self;
+    push( @{$self->{aux}}, $opus );
+    $opus->{chan} = @{$self->{aux}};
+    for ( qw( name strings volume rtime rvol ) ) {
+	next unless exists $args{$_};
+	$opus->{$_} = $args{$_};
+    }
+    # Instrument. Patch name.
+    if ( $args{instr} ) {
+	$opus->{patch} = $args{instr};
+	$opus->{patch} = $MIDI::patch2number{$opus->{patch}} //
+	  croak("Unknown MIDI instrument: $args{instr}");
+    }
+    return $opus;
 }
 
 =head2 $opus->pluck( @actions )
@@ -648,13 +731,13 @@ sub finish {
 	my $ix = 1;
 	foreach ( @{ $self->{aux} } ) {
 	    my $self = $_;
-	    my $ch = $self->{chan} + $ix;
+	    my $ch = $self->{chan};
 	    time2delta(\@{ $self->{events} });
 	    push( @tracks, MIDI::Track->new
 		  ( { events =>
-		      [ [ 'track_name', 0, 'Guitar'.$ix ],
+		      [ [ 'track_name', 0, $self->{name} ],
 			[ 'patch_change', 0, $ch, $self->{patch} ],
-			map { $_->[EV_CHAN] = $ch; $_ }
+#			map { $_->[EV_CHAN] = $ch; $_ }
 			    @{ $self->{events} } ] } ) );
 	    delete $self->{events};
 	}
@@ -699,20 +782,6 @@ sub DESTROY {
     return unless $self && %$self && defined($self->{events}) && @{$self->{events}};
     $self->finish;
     delete $self->{events};
-}
-
-=head2 $opus->combine( $anotheropus )
-
-Combines another opus with this one.
-
-NOTE: The other opus will be emptied.
-
-=cut
-
-sub combine {
-    my ( $self, $anotheropus ) = @_;
-    push( @{ $self->{aux} }, $anotheropus );
-    return $self;
 }
 
 ################ Helper methods ################

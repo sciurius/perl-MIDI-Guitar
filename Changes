@@ -1,5 +1,9 @@
 Revision history for MIDI-Guitar
 
+0.05	2020-03-19
+
+	Modified combine into aux.
+
 0.04	2020-03-18
 
 	Added possibilty to combine several opuses into a single.

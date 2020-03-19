@@ -5,8 +5,8 @@ use Test::More tests => 1;
 
 use MIDI::Guitar;
 
-my $opus1 = MIDI::Guitar->new;
-my $opus2 = MIDI::Guitar->new;
+my $opus1 = MIDI::Guitar->new( lead => -4 );
+my $opus2 = $opus1->aux( name => "Guitar1" );
 
 my $strum = $opus1->strum( '1 4/4 6:90 1-3:80' );
 
@@ -15,8 +15,7 @@ my $chord  = '0 3 2 0 1 0';
 $opus1->play( $strum => $chord )->play;
 $opus2->play->play( $strum => $chord );
 
-$opus1->combine( $opus2 );
-my $opus = $opus1->finish;
+my $opus = $opus1->finish(file=>'aux.midi');
 
 my $ref = bless( {
   format => 1,
@@ -33,7 +32,7 @@ my $ref = bless( {
       events => [
         [ 'track_name', 0, 'Guitar'  ],
         [ 'patch_change', 0, 0, 24   ],
-	[ 'note_on',    0, 0, 40, 90 ],
+	[ 'note_on',  768, 0, 40, 90 ],
 	[ 'note_on',  192, 0, 64, 80 ],
 	[ 'note_on',  192, 0, 60, 80 ],
 	[ 'note_on',  192, 0, 55, 80 ],
@@ -48,10 +47,25 @@ my $ref = bless( {
       events => [
         [ 'track_name', 0, 'Guitar1'  ],
         [ 'patch_change', 0, 1, 24   ],
-	[ 'note_on',  768, 1, 40, 90 ],
+	[ 'note_on', 1536, 1, 40, 90 ],
 	[ 'note_on',  192, 1, 64, 80 ],
 	[ 'note_on',  192, 1, 60, 80 ],
 	[ 'note_on',  192, 1, 55, 80 ],
+      ],
+      type => 'MTrk',
+    }, 'MIDI::Track' ),
+    bless( {
+      events => [
+        [ 'track_name', 0, 'Metronome' ],
+        [ 'patch_change', 0, 9, 0    ],
+        [ 'note_on',    0, 9, 37, 70 ],
+        [ 'note_off',   1, 9, 37,  0 ],
+        [ 'note_on',  191, 9, 37, 70 ],
+        [ 'note_off',   1, 9, 37,  0 ],
+        [ 'note_on',  191, 9, 37, 70 ],
+        [ 'note_off',   1, 9, 37,  0 ],
+        [ 'note_on',  191, 9, 37, 70 ],
+        [ 'note_off',   1, 9, 37,  0 ],
       ],
       type => 'MTrk',
     }, 'MIDI::Track' ),
