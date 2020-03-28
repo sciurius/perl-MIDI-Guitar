@@ -216,8 +216,10 @@ sub _init {
 
     # Instrument. Patch name.
     $self->{patch} = $args{instr};
-    $self->{patch} = $MIDI::patch2number{$self->{patch}} //
-      croak("Unknown MIDI instrument: $args{instr}");
+    unless ( $self->{patch} =~ /^[0-9]+$/ ) {
+	$self->{patch} = $MIDI::patch2number{$self->{patch}} //
+	  croak("Unknown MIDI instrument: $args{instr}");
+    }
 
     # Volume.
     $self->{volume} = $args{volume} || 1;
@@ -226,6 +228,7 @@ sub _init {
     $self->{rtime} = $args{rtime} || 0;
     $self->{rvol}  = $args{rvol}  || 0;
 
+    $self->{chan} = $args{chan} || 0;
     $self->{clock} = 0;
     $self->{ticks} = 192;
     $self->{tpb} = $self->{ticks};
@@ -235,7 +238,22 @@ sub _init {
 	$self->{clock} += abs($self->{lead}) * $self->{tpb};
     }
     $self->{cskip} = 0;
-    @{ $self->{root} } = map { 12+$MIDI::note2number{$_} } split( ' ', $args{strings} );
+    if ( $args{chan} == 9 ) {
+	$self->{root} = [];
+	for ( @{$args{strings}} ) {
+	    croak("Unknown percussion instrument: $_")
+	      unless defined $MIDI::percussion2notenum{$_};
+	    unshift( @{ $self->{root} }, 0+$MIDI::percussion2notenum{$_} );
+	}
+    }
+    else {
+	$self->{root} = [];
+	for ( @{$args{strings}} ) {
+	    croak("Unknown note: $_")
+	      unless defined $MIDI::note2number{$_};
+	    push( @{ $self->{root} }, 12+$MIDI::note2number{$_} );
+	}
+    }
     @{ $self->{sounding} } = (0) x @{ $self->{root} };
 
     $self->{midi} = $args{midi};
@@ -720,7 +738,7 @@ sub finish {
 
 
     unshift( @{ $self->{events} },
-	     [ 'track_name',   0, 'Guitar' ],
+	     [ 'track_name',   0, $self->{name} ],
 	     [ 'patch_change', 0, $self->{chan}, $self->{patch} ] );
     time2delta(\@{ $self->{events} });
     my $track = MIDI::Track->new( { events => \@{ $self->{events} } } );
