@@ -230,7 +230,7 @@ sub _init {
 
     $self->{chan} = $args{chan} || 0;
     $self->{clock} = 0;
-    $self->{ticks} = 192;
+    $self->{ticks} = $args{ticks} || 192;
     $self->{tpb} = $self->{ticks};
 
     $self->{lead} = $args{lead};
@@ -238,9 +238,13 @@ sub _init {
 	$self->{clock} += abs($self->{lead}) * $self->{tpb};
     }
     $self->{cskip} = 0;
-    if ( $args{chan} == 9 ) {
+    my $strings = $args{strings};
+    unless ( UNIVERSAL::isa($strings,'ARRAY') ) {
+	$strings = [ split(' ',$strings) ];
+    }
+    if ( $self->{chan} == 9 ) {
 	$self->{root} = [];
-	for ( @{$args{strings}} ) {
+	for ( @$strings ) {
 	    croak("Unknown percussion instrument: $_")
 	      unless defined $MIDI::percussion2notenum{$_};
 	    unshift( @{ $self->{root} }, 0+$MIDI::percussion2notenum{$_} );
@@ -248,7 +252,7 @@ sub _init {
     }
     else {
 	$self->{root} = [];
-	for ( @{$args{strings}} ) {
+	for ( @$strings ) {
 	    croak("Unknown note: $_")
 	      unless defined $MIDI::note2number{$_};
 	    push( @{ $self->{root} }, 12+$MIDI::note2number{$_} );
@@ -826,6 +830,9 @@ sub note {
     if ( $velocity > 127 ) {
 	$velocity = 127;
     }
+
+    # Percussion notes do not need note_off.
+    return $self if $velocity == 0 && $self->{chan} == 9;
 
     push( @{ $self->{events} },
 	  [ $velocity > 0 ? 'note_on' : 'note_off',
