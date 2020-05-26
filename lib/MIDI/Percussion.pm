@@ -130,7 +130,7 @@ sub new {
 
     $args{instr} = delete $opts{kit} if defined $opts{kit};
     $args{strings} = delete $opts{instr};
-    $self->_init( %args );
+    $self->_init( %args, %opts );
     return $self;
 }
 
@@ -153,8 +153,15 @@ For example:
 
 Note: Each line B<must> contain a series of dashes and numbers between
 vertical bars (a measure). Multiple measures may be specified adjacent
-to another. Each measure B<must> contain a number of characters equal to
+to another. Each measure B<should> contain a number of characters equal to
 an integer multiple of the beats per measure.
+
+    |5|             5 on one
+    |54|            5 on one, 4 on three
+    |5444|          5 on one, 4 on two, three, four
+    |5-4-4-4-|      same
+    |5--4--4--4--|  same
+    |5--4--4--444|  same, with triplet on four
 
 The numbers denote the force with which the instrument will be hit.
 Zero = mute, 9 = loudest.
@@ -224,10 +231,10 @@ sub tab {
 	    next if $c eq '-';
 	    my $str = @{ $self->{root} } - $s - 1;
 	    my $note = $self->{root}->[$str];
-	    if ( $self->{sounding}->[$str] ) {
-		$self->note( $cclock+$dc, $self->{sounding}->[$str], 0 );
-	    }
-	    my $vel = $vel * $c/9;
+	    #if ( $self->{sounding}->[$str] ) {
+	    #	$self->note( $cclock+$dc, $self->{sounding}->[$str], 0 );
+	    #}
+	    my $vel = int( $vel * $c/9 );
 	    $self->note( $cclock+$dc, $note,
 		  $vel > $self->{rvol} ? $vel + $dv : $vel );
 	    $self->{sounding}->[$str] = $vel ? $note : 0;
