@@ -148,6 +148,10 @@ Default is common guitar tuning, C<E2 A2 D3 G3 B3 E4>.
 
 Note: There can be any number of strings.
 
+=item ticks
+
+Experts only.
+
 =item rtime
 
 Time randomizer. Suitable values are 0 .. 10.
@@ -222,8 +226,13 @@ sub _init {
     $self->{q} = $2;
 
     # Beats per minutes.
-    $args{tempo} //= $args{bmp}; delete $args{bpm};
+    $args{tempo} //= $args{bpm}; delete $args{bpm};
     $self->{bpmin} = $self->{bpmin0} = 0+delete($args{tempo});
+
+    $args{channel} //= $args{chan}; delete $args{chan};
+    $self->{chan} = delete($args{channel}) || 0;
+    croak("Invalid MIDI channel, should be between 0 and 15: $args{channel}")
+      unless $self->{chan} >= 0 && $self->{chan} <= 15;
 
     # Instrument. Patch name.
     $args{instrument} //= $args{instr}; delete $args{instr};
@@ -244,13 +253,8 @@ sub _init {
     $args{rvolume} //= $args{rvol}; delete $args{rvol};
     $self->{rvol}  = delete($args{rvolume}) || 0;
 
-    $args{channel} //= $args{chan}; delete $args{chan};
-    $self->{chan} = delete($args{channel}) || 0;
-    croak("Invalid MIDI channel, should be between 0 and 15: $args{channel}")
-      unless $self->{chan} >= 0 && $self->{chan} <= 15;
-
     $self->{clock} = 0;
-    $self->{ticks} = $args{ticks} || 192;
+    $self->{ticks} = delete $args{ticks} || 192;
     $self->{tpb} = $self->{ticks};
 
     $args{lead_in} //= $args{lead}; delete $args{lead};

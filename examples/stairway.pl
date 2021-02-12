@@ -10,9 +10,9 @@ use FindBin;
 use lib "$FindBin::Bin/../lib";
 use MIDI::Guitar;
 
-my $opus = MIDI::Guitar->new( sig  => '4/4',
-			      bpm  => 80,
-			      midi => 'stairway.midi' );
+my $opus = MIDI::Guitar->new( signature => '4/4',
+			      tempo     => 80,
+			      midi      => 'stairway.midi' );
 
 # The tab is downloaded from one of the many internet sites that have
 # all kinds of tabs. Since there are many forms of guitar tabs, and

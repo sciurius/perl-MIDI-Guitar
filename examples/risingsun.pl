@@ -18,12 +18,12 @@ use MIDI::Guitar;
 
 =cut
 
-my $opus = MIDI::Guitar->new( sig   => '6/8',
-			      bpm   => 240,
-			      instr => 'Electric Guitar(clean)',
-			      rtime =>  10,
-			      rvol  =>   5,
-			      midi  => 'risingsun.midi' );
+my $opus = MIDI::Guitar->new( signature  => '6/8',
+			      tempo      => 240,
+			      instrument => 'Electric Guitar(clean)',
+			      rtime      =>  10,
+			      rvolume    =>   5,
+			      midi       => 'risingsun.midi' );
 
 # Chord shapes.
 my $Am = '0 0 2 2 1 0';
