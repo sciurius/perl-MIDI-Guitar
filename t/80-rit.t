@@ -5,7 +5,7 @@ use Test::More tests => 1;
 
 use MIDI::Guitar;
 
-my $opus = MIDI::Guitar->new;
+my $opus = MIDI::Guitar->new( testing => 1 );
 
 my $strum = $opus->strum( '1 4/4 6:90 1-3:80' );
 

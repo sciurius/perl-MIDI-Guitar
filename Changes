@@ -1,5 +1,18 @@
 Revision history for MIDI-Guitar
 
+0.06
+
+	Allow play to take an array of patters, and select a random one.
+
+	Use formal names for init values (e.g. signature instead of
+	sig, tempo instead of bpm).
+
+	Better argument checking.
+
+	Add identification to the MIDI (text_events).
+
+	Update tests and MANIFEST.
+
 0.05	2020-03-19
 
 	Modified combine into aux.

@@ -5,7 +5,7 @@ use Test::More tests => 1;
 
 use MIDI::Guitar;
 
-my $opus = MIDI::Guitar->new;
+my $opus = MIDI::Guitar->new( testing => 1 );
 
 $opus->tab( 4, <<EOD );
 |------5-7-----7-|

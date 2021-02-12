@@ -5,7 +5,7 @@ use Test::More tests => 1;
 
 use MIDI::Guitar;
 
-my $opus1 = MIDI::Guitar->new( lead => -4 );
+my $opus1 = MIDI::Guitar->new( testing => 1, lead_in => 4 );
 my $opus2 = $opus1->aux( name => "Guitar1" );
 
 my $strum = $opus1->strum( '1 4/4 6:90 1-3:80' );
@@ -15,7 +15,7 @@ my $chord  = '0 3 2 0 1 0';
 $opus1->play( $strum => $chord )->play;
 $opus2->play->play( $strum => $chord );
 
-my $opus = $opus1->finish(file=>'aux.midi');
+my $opus = $opus1->finish( file => 'aux.midi' );
 
 my $ref = bless( {
   format => 1,

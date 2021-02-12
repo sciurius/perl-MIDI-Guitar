@@ -5,7 +5,7 @@ use Test::More tests => 1;
 
 use MIDI::Guitar;
 
-my $opus = MIDI::Guitar->new;
+my $opus = MIDI::Guitar->new( testing => 1 );
 
 my $pluck = $opus->pluck( '1.0  6:90',
 			  '2.0  3:80',

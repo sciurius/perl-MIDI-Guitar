@@ -11,7 +11,7 @@ MIDI::Guitar - Plucked guitar MIDI
 
 =cut
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 =head1 SYNOPSIS
 
@@ -21,7 +21,7 @@ guitar sounds.
     use MIDI::Guitar;
 
     my $opus = MIDI::Guitar->new();
-    $opus->init( sig => '3/4', bpm => 160 );
+    $opus->init( signature => '3/4', tempo => 160 );
 
     # A pluck pattern.
     my $p1 = $opus->pluck( '1 5:80',
@@ -121,24 +121,24 @@ Possible arguments are:
 
 The MIDI track name.
 
-=item sig
+=item signature
 
 Time signature. This should be a fraction where the denominator is a
 power of 2, e.g. C<4/4> or C<6/8>.
 
-Default is C<4/4>.
+Short name is C<sig>. Default is C<4/4>.
 
-=item bpm
+=item tempo
 
-Beats per minute.
+Tempo, in beats per minute.
 
-Default is C<100>.
+Alias name is C<bpm>. Default is C<100>.
 
-=item instr
+=item instrument
 
 MIDI instrument name. See L<MIDI> for a list of instrument names.
 
-Default is C<Acoustic Guitar(nylon)>.
+Short name is C<instr>. Default is C<Acoustic Guitar(nylon)>.
 
 =item strings
 
@@ -152,23 +152,34 @@ Note: There can be any number of strings.
 
 Time randomizer. Suitable values are 0 .. 10.
 
-=item rvol
+=item rvolume
 
 Volume randomizer. Suitable values are 0 .. 6.
 
-=item lead
+Short name is C<rvol>. Defaukt is 0 (no volume randomizing).
 
-Lead-in and metronome ticks.
+=item lead_in
 
-If zero, or greater than zero, a metronome tick in included in the MIDI.
+Lead-in ticks.
 
-A greater than zero value specifies the number of lead-in bars.
+Specifies the number of lead-in bars.
 
-TODO A negative value yields lead-in bars but no metronome.
+Short name is C<lead>. Default is 0 (no lead_in).
+
+=item metronome
+
+If nonzero, a metronome tick in included in the MIDI.
 
 =item midi
 
-The name of the MIDI file to be produced.
+The name of the MIDI file to be produced, if any.
+
+=item channel
+
+Experts only. Designates the MIDI channel (0 .. 15) to use.
+
+Note that the lead_in and metronome will always use channel 9, as per
+MIDI conventions.
 
 =back
 
@@ -182,63 +193,80 @@ sub new {
     $self->{chan} = 0;
 
     # Defaults.
-    my %args = ( name    => "Guitar",
-		 sig     => '4/4',
-		 bpm     => 100,
-		 instr   => 'Acoustic Guitar(nylon)',
-		 strings => 'E2 A2 D3 G3 B3 E4',
-		 volume  => 1,
+    my %args = ( name       => "Guitar",
+		 signature  => '4/4',
+		 tempo      => 100,
+		 instrument => 'Acoustic Guitar(nylon)',
+		 strings    => 'E2 A2 D3 G3 B3 E4',
+		 volume     => 1,
 	       );
     $self->_init( %args, @_);
     return $self;
 }
 
 
-=head2 $opus->init( %args )
-
-=cut
-
 sub _init {
     my $self = shift;
     my %args = ( @_ );
 
-    $self->{name} = $args{name} || "Guitar";
+    $self->{testing} = delete $args{testing};
+
+    $self->{name} = delete($args{name}) || "Guitar";
 
     # Time signature.
-    croak("Invalid time signature: $args{sig}")
-      unless $args{sig} =~ m;^(\d+)/(\d)$;;
-    $self->{sig} = $args{sig};
+    $args{signature} //= $args{sig}; delete $args{sig};
+    $self->{sig} = delete $args{signature};
+    croak("Invalid time signature: $args{signature}")
+      unless $self->{sig} =~ m;^(\d+)/(\d)$;;
     $self->{bpm} = $1;		# beats per measure
     $self->{q} = $2;
 
     # Beats per minutes.
-    $self->{bpmin} = $self->{bpmin0} = 0+$args{bpm};
+    $args{tempo} //= $args{bmp}; delete $args{bpm};
+    $self->{bpmin} = $self->{bpmin0} = 0+delete($args{tempo});
 
     # Instrument. Patch name.
-    $self->{patch} = $args{instr};
+    $args{instrument} //= $args{instr}; delete $args{instr};
+    $self->{patch} = delete $args{instrument};
     unless ( $self->{patch} =~ /^[0-9]+$/ ) {
 	$self->{patch} = $MIDI::patch2number{$self->{patch}} //
-	  croak("Unknown MIDI instrument: $args{instr}");
+	  croak("Unknown MIDI instrument: $args{instrument}");
     }
 
     # Volume.
-    $self->{volume} = $args{volume} || 1;
+    $args{volume} //= $args{vol}; delete $args{vol};
+    $self->{volume} = delete($args{volume}) || 1;
+    croak("Invalid volume, should be between 0 and 1: $args{volume}")
+      unless $self->{volume} >= 0 && $self->{volume} <= 1.5;
 
     # Randomizers.
-    $self->{rtime} = $args{rtime} || 0;
-    $self->{rvol}  = $args{rvol}  || 0;
+    $self->{rtime} = delete($args{rtime}) || 0;
+    $args{rvolume} //= $args{rvol}; delete $args{rvol};
+    $self->{rvol}  = delete($args{rvolume}) || 0;
 
-    $self->{chan} = $args{chan} || 0;
+    $args{channel} //= $args{chan}; delete $args{chan};
+    $self->{chan} = delete($args{channel}) || 0;
+    croak("Invalid MIDI channel, should be between 0 and 15: $args{channel}")
+      unless $self->{chan} >= 0 && $self->{chan} <= 15;
+
     $self->{clock} = 0;
     $self->{ticks} = $args{ticks} || 192;
     $self->{tpb} = $self->{ticks};
 
-    $self->{lead} = $args{lead};
+    $args{lead_in} //= $args{lead}; delete $args{lead};
+    $self->{lead} = delete $args{lead_in};
     if ( defined $self->{lead} && $self->{lead} ) {
-	$self->{clock} += abs($self->{lead}) * $self->{tpb};
+	$self->{lead} = -$self->{lead} if $self->{lead} < 0;
+	$self->{clock} += $self->{lead} * $self->{tpb};
+    }
+    if ( delete $args{metronome} ) {
+	$self->{lead} //= 0;
+    }
+    else {
+	$self->{lead} = -$self->{lead} if defined( $self->{lead} );
     }
     $self->{cskip} = 0;
-    my $strings = $args{strings};
+    my $strings = delete $args{strings};
     unless ( UNIVERSAL::isa($strings,'ARRAY') ) {
 	$strings = [ split(' ',$strings) ];
     }
@@ -260,7 +288,14 @@ sub _init {
     }
     @{ $self->{sounding} } = (0) x @{ $self->{root} };
 
-    $self->{midi} = $args{midi};
+    # Output file, if any. May also be specified in a C<finish> call.
+    $self->{midi} = delete $args{midi};
+
+    if ( %args ) {
+	croak( "Unrecognized init arguments: " .
+	       join( " ", sort keys %args ) );
+    }
+
     return $self;
 }
 
@@ -272,6 +307,8 @@ original, but will be using a different MIDI channel.
 The arguments are as with new() and will default to the values of the
 creating instance. In practice, only the following arguments make sense:
 
+Experts only. Argument values are not yet validated.
+
 =over 2
 
 =item *
@@ -280,7 +317,7 @@ name
 
 =item *
 
-instr
+instrument
 
 =item *
 
@@ -296,7 +333,7 @@ rtime
 
 =item *
 
-rvol
+rvolume
 
 =back
 
@@ -305,6 +342,15 @@ rvol
 sub aux {
     my ( $self, %args ) = @_;
 
+    if ( %args ) {
+	my $unk = "";
+	for ( sort keys %args ) {
+	    next if /^rvol|rvolume|rtime|volume|instr|instrument|strings|name$/;
+	    $unk .= $_ . " ";
+	}
+	croak("Unrecognized init arguments for aux: $unk") if $unk;
+    }
+ 
     my $opus = bless {} => ref($self);
     @{$opus}{keys(%$self)} = values(%$self);
 
@@ -319,16 +365,19 @@ sub aux {
     $opus->{master} = $self;
     push( @{$self->{aux}}, $opus );
     $opus->{chan} = @{$self->{aux}};
-    for ( qw( name strings volume rtime rvol ) ) {
+
+    for ( qw( name strings volume rtime rvol rvolume ) ) {
 	next unless exists $args{$_};
-	$opus->{$_} = $args{$_};
+	$opus->{$_ eq "rvolume" ? "rvol" : $_} = delete $args{$_};
     }
     # Instrument. Patch name.
-    if ( $args{instr} ) {
-	$opus->{patch} = $args{instr};
+    $args{instrument} //= $args{instr}; delete $args{inst};
+    if ( $args{instrument} || $args{instr} ) {
+	$opus->{patch} = $args{instrument} //= $args{instr};
 	$opus->{patch} = $MIDI::patch2number{$opus->{patch}} //
-	  croak("Unknown MIDI instrument: $args{instr}");
+	  croak("Unknown MIDI instrument: $args{instrument}");
     }
+
     return $opus;
 }
 
@@ -459,6 +508,9 @@ Plays a pattern over the strings.
 
 Pattern is the result from an earlier call to pluck(), strum(), or tab().
 
+Pattern may be a reference to an array with patterns. If so, a random
+pattern will be selected from the array.
+
 Strings is a space separated series of finger positions. The strings
 are played according to the positions. C<0> indicates an open string,
 C<-> a muted string.
@@ -479,6 +531,11 @@ sub play {
 
     my ( $pattern, $strings ) = @_;
 
+    # If it is an array of patterns, random select one.
+    if ( UNIVERSAL::isa($pattern, 'ARRAY' )
+	 && UNIVERSAL::isa($pattern->[0], 'MIDI::Guitar::Pattern' ) ) {
+	$pattern = $pattern->[ rand( scalar(@$pattern) ) ];
+    }
     unless ( UNIVERSAL::isa($pattern, 'MIDI::Guitar::Pattern' ) ) {
 	croak("Pattern required");
     }
@@ -721,17 +778,28 @@ sub finish {
 	$self->note( $self->{clock}, $_, 0 );
     }
 
-    my @ctlevents = ( [ set_tempo => 0, int(60000000/$self->{bpmin0}) ],
-		      [ time_signature => 0,
-			$self->{bpm},
-			$self->{q} == 2 ? 1
-			: $self->{q} == 4 ? 2
-			: $self->{q} == 8 ? 3
-			: $self->{q} == 16 ? 4 : 0,
-			24,
-			8,
-		      ],
-		    );
+    my @ctlevents;
+    unless ( $self->{testing} ) {
+	push( @ctlevents,
+	      [ text_event => 0,
+		join( "", "Created by ", __PACKAGE__,
+		      " version ", $VERSION ) ],
+	      [ text_event => 0,
+		"https://github.com/sciurius/perl-MIDI-Guitar" ] );
+    }
+
+    push( @ctlevents,
+	  [ set_tempo => 0, int(60000000/$self->{bpmin0}) ],
+	  [ time_signature => 0,
+	    $self->{bpm},
+	    $self->{q} == 2 ? 1
+	    : $self->{q} == 4 ? 2
+	    : $self->{q} == 8 ? 3
+	    : $self->{q} == 16 ? 4 : 0,
+	    24,
+	    8,
+	  ],
+	);
 
     if ( my $xtempo = $self->{xtempo} ) {
 	push( @ctlevents, [ 'set_tempo', $_->[0], $_->[1] ] ) for @$xtempo;

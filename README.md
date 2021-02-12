@@ -6,7 +6,7 @@ guitar sounds.
     use MIDI::Guitar;
 
     my $opus = MIDI::Guitar->new();
-    $opus->init( sig => '3/4', bpm => 160 );
+    $opus->init( signature => '3/4', tempo => 160 );
 
     # A pluck pattern.
     my $p1 = $opus->pluck( '1 5:80',
