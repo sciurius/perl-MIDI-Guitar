@@ -11,7 +11,7 @@ MIDI::Guitar - Plucked guitar MIDI
 
 =cut
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 =head1 SYNOPSIS
 
@@ -126,19 +126,19 @@ The MIDI track name.
 Time signature. This should be a fraction where the denominator is a
 power of 2, e.g. C<4/4> or C<6/8>.
 
-Short name is C<sig>. Default is C<4/4>.
+Default is C<4/4>.
 
 =item tempo
 
 Tempo, in beats per minute.
 
-Alias name is C<bpm>. Default is C<100>.
+Default is C<100>.
 
 =item instrument
 
 MIDI instrument name. See L<MIDI> for a list of instrument names.
 
-Short name is C<instr>. Default is C<Acoustic Guitar(nylon)>.
+Default is C<Acoustic Guitar(nylon)>.
 
 =item strings
 
@@ -160,7 +160,7 @@ Time randomizer. Suitable values are 0 .. 10.
 
 Volume randomizer. Suitable values are 0 .. 6.
 
-Short name is C<rvol>. Defaukt is 0 (no volume randomizing).
+Defaukt is 0 (no volume randomizing).
 
 =item lead_in
 
@@ -168,7 +168,7 @@ Lead-in ticks.
 
 Specifies the number of lead-in bars.
 
-Short name is C<lead>. Default is 0 (no lead_in).
+Default is 0 (no lead_in).
 
 =item metronome
 
@@ -218,7 +218,6 @@ sub _init {
     $self->{name} = delete($args{name}) || "Guitar";
 
     # Time signature.
-    $args{signature} //= $args{sig}; delete $args{sig};
     $self->{sig} = delete $args{signature};
     croak("Invalid time signature: $args{signature}")
       unless $self->{sig} =~ m;^(\d+)/(\d)$;;
@@ -226,16 +225,13 @@ sub _init {
     $self->{q} = $2;
 
     # Beats per minutes.
-    $args{tempo} //= $args{bpm}; delete $args{bpm};
     $self->{bpmin} = $self->{bpmin0} = 0+delete($args{tempo});
 
-    $args{channel} //= $args{chan}; delete $args{chan};
     $self->{chan} = delete($args{channel}) || 0;
     croak("Invalid MIDI channel, should be between 0 and 15: $args{channel}")
       unless $self->{chan} >= 0 && $self->{chan} <= 15;
 
     # Instrument. Patch name.
-    $args{instrument} //= $args{instr}; delete $args{instr};
     $self->{patch} = delete $args{instrument};
     unless ( $self->{patch} =~ /^[0-9]+$/ ) {
 	$self->{patch} = $MIDI::patch2number{$self->{patch}} //
@@ -243,24 +239,20 @@ sub _init {
     }
 
     # Volume.
-    $args{volume} //= $args{vol}; delete $args{vol};
     $self->{volume} = delete($args{volume}) || 1;
     croak("Invalid volume, should be between 0 and 1: $args{volume}")
       unless $self->{volume} >= 0 && $self->{volume} <= 1.5;
 
     # Randomizers.
     $self->{rtime} = delete($args{rtime}) || 0;
-    $args{rvolume} //= $args{rvol}; delete $args{rvol};
     $self->{rvol}  = delete($args{rvolume}) || 0;
 
     $self->{clock} = 0;
     $self->{ticks} = delete $args{ticks} || 192;
     $self->{tpb} = $self->{ticks};
 
-    $args{lead_in} //= $args{lead}; delete $args{lead};
     $self->{lead} = delete $args{lead_in};
     if ( defined $self->{lead} && $self->{lead} ) {
-	$self->{lead} = -$self->{lead} if $self->{lead} < 0;
 	$self->{clock} += $self->{lead} * $self->{tpb};
     }
     if ( delete $args{metronome} ) {
@@ -370,14 +362,13 @@ sub aux {
     push( @{$self->{aux}}, $opus );
     $opus->{chan} = @{$self->{aux}};
 
-    for ( qw( name strings volume rtime rvol rvolume ) ) {
+    for ( qw( name strings volume rtime rvolume ) ) {
 	next unless exists $args{$_};
 	$opus->{$_ eq "rvolume" ? "rvol" : $_} = delete $args{$_};
     }
     # Instrument. Patch name.
-    $args{instrument} //= $args{instr}; delete $args{inst};
-    if ( $args{instrument} || $args{instr} ) {
-	$opus->{patch} = $args{instrument} //= $args{instr};
+    if ( $args{instrument} ) {
+	$opus->{patch} = $args{instrument};
 	$opus->{patch} = $MIDI::patch2number{$opus->{patch}} //
 	  croak("Unknown MIDI instrument: $args{instrument}");
     }

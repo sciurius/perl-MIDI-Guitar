@@ -12,17 +12,20 @@ MIDI::Percussion - MIDI Percussion
 
 =cut
 
-our $VERSION = '0.05';
+our $VERSION = $MIDI::Guitar::VERSION;
 
 =head1 SYNOPSIS
 
 This module provides basic tools to generated MIDI for percussion.
 
+It is derived from MIDI::Guitar, see L<MIDI::Guitar> for features
+and behaviour.
+
     use MIDI::Percussion;
 
-    my $opus = MIDI::Percussion->new( sig  => '4/4',
-				      bpm  => 80,
-				      instr =>
+    my $opus = MIDI::Percussion->new( signature   => '4/4',
+				      tempo       => 80,
+				      instruments =>
 				      [ "Closed Hi-Hat",
 					"Pedal Hi-Hat",
 					"Crash Cymbal 1",
@@ -58,24 +61,24 @@ Possible arguments are:
 
 The MIDI track name.
 
-=item sig
+=item signature
 
 Time signature. This should be a fraction where the denominator is a
 power of 2, e.g. C<4/4> or C<6/8>.
 
-Default is C<4/4>.
+Handled by the base class. Default is C<4/4>.
 
-=item bpm
+=item tempo
 
-Beats per minute.
+Tempo, in beats per minute.
 
-Default is C<100>.
+Handled by the base class. Default is C<100>.
 
 =item kit
 
 Drum kit selection. 0 = Standard Drum Kit.
 
-=item instr
+=item instruments
 
 An array reference with instrument names.
 
@@ -85,25 +88,31 @@ Note: There can be any number of instruments.
 
 =item rtime
 
-Time randomizer. Suitable values are 0 .. 10.
+Handled by the base class. Time randomizer. Suitable values are 0 .. 10.
 
-=item rvol
+=item rvolume
 
-Volume randomizer. Suitable values are 0 .. 6.
+Handled by the base class. Volume randomizer. Suitable values are 0 .. 6.
 
-=item lead
+=item lead_in
 
-Lead-in and metronome ticks.
+Lead-in ticks.
 
-If zero, or greater than zero, a metronome tick in included in the MIDI.
+Specifies the number of lead-in beats (not bars).
 
-A greater than zero value specifies the number of lead-in bars.
+Handled by the base class. Default is 0 (no lead_in).
 
-TODO A negative value yields lead-in bars but no metronome.
+=item metronome
+
+If nonzero, a metronome tick in included in the MIDI.
+
+Handled by the base class.
 
 =item midi
 
 The name of the MIDI file to be produced.
+
+Handled by the base class.
 
 =back
 
@@ -115,11 +124,11 @@ sub new {
     my %opts = ( @_ );
 
     # Defaults.
-    my %args = ( name    => "Percussion",
-		 chan    => 9,
-		 sig     => '4/4',
-		 bpm     => 100,
-		 instr   => 0,
+    my %args = ( name       => "Percussion",
+		 channel    => 9,
+		 signature  => '4/4',
+		 tempo      => 100,
+		 instrument => 0,
 		 strings => [ "Closed Hi-Hat",
 			      "Pedal Hi-Hat",
 			      "Crash Cymbal 1",
@@ -128,8 +137,8 @@ sub new {
 		 volume  => 1,
 	       );
 
-    $args{instr} = delete $opts{kit} if defined $opts{kit};
-    $args{strings} = delete $opts{instr};
+    $args{instrument} = delete $opts{kit} if defined $opts{kit};
+    $args{strings} = delete $opts{instruments};
     $self->_init( %args, %opts );
     return $self;
 }
@@ -260,4 +269,4 @@ under the same terms as Perl itself.
 
 =cut
 
-1; # End of MIDI::Guitar
+1; # End of MIDI::Percussion

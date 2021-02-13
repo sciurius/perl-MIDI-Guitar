@@ -3,6 +3,7 @@ MANIFEST
 Makefile.PL
 README.md
 lib/MIDI/Guitar.pm
+lib/MIDI/Percussion.pm
 t/00-load.t
 t/02-preamble.t
 t/10-strum.t
@@ -12,3 +13,13 @@ t/80-rit.t
 t/81-cresc.t
 t/82-aux.t
 t/83-aux.t
+examples/drums2.midi
+examples/drums2.pl
+examples/drums.midi
+examples/drums.pl
+examples/ocells.midi
+examples/ocells.pl
+examples/risingsun.midi
+examples/risingsun.pl
+examples/stairway.midi
+examples/stairway.pl
