@@ -160,13 +160,13 @@ Time randomizer. Suitable values are 0 .. 10.
 
 Volume randomizer. Suitable values are 0 .. 6.
 
-Defaukt is 0 (no volume randomizing).
+Default is 0 (no volume randomizing).
 
 =item lead_in
 
 Lead-in ticks.
 
-Specifies the number of lead-in bars.
+Specifies the number of lead-in beats (not bars).
 
 Default is 0 (no lead_in).
 
