@@ -5,10 +5,12 @@ README.md
 lib/MIDI/Guitar.pm
 lib/MIDI/Percussion.pm
 t/00-load.t
+t/01-load.t
 t/02-preamble.t
 t/10-strum.t
 t/20-pluck.t
 t/30-tab.t
+t/30-perc.t
 t/80-rit.t
 t/81-cresc.t
 t/82-aux.t

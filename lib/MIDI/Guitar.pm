@@ -11,7 +11,7 @@ MIDI::Guitar - Plucked guitar MIDI
 
 =cut
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 =head1 SYNOPSIS
 
@@ -133,6 +133,15 @@ Default is C<4/4>.
 Tempo, in beats per minute.
 
 Default is C<100>.
+
+=item volume
+
+Initial volume scaling factor. Individual velocities of string plucks
+are scaled by this factor.
+
+Valid values are C<0> .. C<1.5>. Default value is C<1>.
+
+Note that no final velocity will exceed the MIDI maximum of C<127>.
 
 =item instrument
 
