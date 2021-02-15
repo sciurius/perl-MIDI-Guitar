@@ -787,8 +787,6 @@ removed after playing.
 
 Returns the MIDI Opus.
 
-NOTE: If appropriate,  this method is implicitly called upon destruction,
-
 =cut
 
 sub finish {
@@ -907,13 +905,6 @@ sub finish {
     delete $self->{events};
 
     return $opus;
-}
-
-sub DESTROY {
-    my $self = shift;
-    return unless $self && %$self && defined($self->{events}) && @{$self->{events}};
-    $self->finish;
-    delete $self->{events};
 }
 
 ################ Helper methods ################
