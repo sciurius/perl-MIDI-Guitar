@@ -96,7 +96,6 @@ use constant MIDI_CHAN_PERCUSSION => 10;
 # $cskip;			# skip metro on sound out
 # @root;			# root notes for strings
 # @sounding;			# strings that sound
-# @xevents
 # $cresc
 
 # MIDI parameters.
@@ -365,7 +364,7 @@ sub aux {
     else {
 	$opus->{root} = [ @{ $self->{root} } ];
     }
-    $opus->{$_} = [] for qw( events xevents );
+    $opus->{events} = [];
     $opus->{sounding} = [ (0) x @{ $opus->{root} } ];
     $opus->{master} = $self;
     push( @{$self->{aux}}, $opus );
