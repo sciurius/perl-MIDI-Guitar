@@ -772,6 +772,15 @@ Writes the piece to this MIDI file.
 
 The filename can also be specified upon initialisation.
 
+=item separate
+
+If true, the individual tracks are written to separate MIDI files.
+
+The filenames are formed by appending the track name to the base filename.
+
+Note that all MIDI files will contain the lead_in / metronome track.
+This may or may not be what you want.
+
 =item play
 
 Plays the MIDI through a suitable MIDI player. This can be an array
@@ -836,23 +845,7 @@ sub finish {
     time2delta(\@{ $self->{events} });
     my $track = MIDI::Track->new( { events => \@{ $self->{events} } } );
 
-    my @tracks = ( $ctl, $track );
-
-    if ( $self->{aux} ) {
-	my $ix = 1;
-	foreach ( @{ $self->{aux} } ) {
-	    my $self = $_;
-	    my $ch = $self->{chan};
-	    time2delta(\@{ $self->{events} });
-	    push( @tracks, MIDI::Track->new
-		  ( { events =>
-		      [ [ 'track_name', 0, $self->{name} ],
-			[ 'patch_change', 0, $ch, $self->{patch} ],
-#			map { $_->[EV_CHAN] = $ch; $_ }
-			    @{ $self->{events} } ] } ) );
-	    delete $self->{events};
-	}
-    }
+    my @tracks = ( $ctl );
 
     if ( defined( my $l = $self->{lead} ) ) {
 	my $tm       =  0;
@@ -876,21 +869,71 @@ sub finish {
 	push( @tracks, MIDI::Track->new( { events => \@mm } ) );
     }
 
+    push( @tracks, $track );
+
+    # Prepare aux tracks (if any).
+    $self->{aux} //= [];
+    for ( my $i = 0; $i < @{$self->{aux}}; $i++ ) {
+	my $track = $self->{aux}->[$i];
+	my $ch = $track->{chan};
+	time2delta(\@{ $track->{events} });
+	$self->{aux}->[$i] =
+	  MIDI::Track->new
+	    ( { events =>
+		[ [ 'track_name', 0, $track->{name} ],
+		  [ 'patch_change', 0, $track->{chan},
+		    $track->{patch} ],
+		  @{ $track->{events} } ] } );
+    }
+
+    $opts{file} //= $self->{midi};
+
+    if ( $opts{file} && $opts{separate} ) {
+
+	# Writing the MIDI channels to separate MIDI files.
+
+	use File::Basename;
+	my ( $name, $path, $suffix ) = fileparse($opts{file}, qr/\.[^.]*/);
+
+	# Main track.
+	my $tn = $self->{name};
+	$tn =~ s/\W+/_/g;
+	my $opus = MIDI::Opus->new( { format => 1,
+				      ticks => $self->{ticks},
+				      tracks => \@tracks } );
+	$opus->write_to_file("$path/$name-$tn$suffix");
+
+	# Aux tracks.
+	for my $track ( @{$self->{aux}} ) {
+	    $tracks[-1] = $track;
+	    # We know where we hid the track name ;)
+	    $tn = $track->events_r->[0][2];
+	    $tn =~ s/\W+/_/g;
+	    $opus->write_to_file("$path/$name-$tn$suffix");
+	}
+	delete $self->{events};
+	return;
+    }
+
+    # Not separate, add the aux tracks in.
+    push( @tracks, @{$self->{aux}} );
+
+    # Create the Opus.
     my $opus = MIDI::Opus->new( { format => 1,
 				  ticks => $self->{ticks},
 				  tracks => \@tracks } );
 
-    $opts{file} //= $self->{midi};
     my $tmp;
-    if ( $opts{file} ) {
-	$opus->write_to_file( $opts{file} );
+    my $fn = $opts{file};
+    if ( $fn ) {
+	$opus->write_to_file( $fn );
     }
     elsif ( $opts{play} ) {
 	use File::Temp qw( tempfile );
-	my ( $fh, $filename ) = tempfile();
+	my $fh;
+	( $fh, $fn ) = tempfile();
 	close($fh);
-	$opus->write_to_file( $filename );
-	$opts{file} = $filename;
+	$opus->write_to_file( $fn );
 	$tmp++;
     }
 
@@ -898,8 +941,8 @@ sub finish {
 	my @cmd = UNIVERSAL::isa($opts{play}, 'ARRAY')
 	  ? @{$opts{play}}
 	  : ( "midi-play" );
-	system( @cmd, $opts{file} );
-	unlink( $opts{file} ) if $tmp;
+	system( @cmd, $fn );
+	unlink($fn) if $tmp;
     }
 
     delete $self->{events};

@@ -30,6 +30,21 @@ my $ref = bless( {
     }, 'MIDI::Track' ),
     bless( {
       events => [
+        [ 'track_name', 0, 'Metronome' ],
+        [ 'patch_change', 0, 9, 0    ],
+        [ 'note_on',    0, 9, 37, 70 ],
+        [ 'note_off',   1, 9, 37,  0 ],
+        [ 'note_on',  191, 9, 37, 70 ],
+        [ 'note_off',   1, 9, 37,  0 ],
+        [ 'note_on',  191, 9, 37, 70 ],
+        [ 'note_off',   1, 9, 37,  0 ],
+        [ 'note_on',  191, 9, 37, 70 ],
+        [ 'note_off',   1, 9, 37,  0 ],
+      ],
+      type => 'MTrk',
+    }, 'MIDI::Track' ),
+    bless( {
+      events => [
         [ 'track_name', 0, 'Guitar'  ],
         [ 'patch_change', 0, 0, 24   ],
 	[ 'note_on',  768, 0, 40, 90 ],
@@ -51,21 +66,6 @@ my $ref = bless( {
 	[ 'note_on',  192, 1, 64, 80 ],
 	[ 'note_on',  192, 1, 60, 80 ],
 	[ 'note_on',  192, 1, 55, 80 ],
-      ],
-      type => 'MTrk',
-    }, 'MIDI::Track' ),
-    bless( {
-      events => [
-        [ 'track_name', 0, 'Metronome' ],
-        [ 'patch_change', 0, 9, 0    ],
-        [ 'note_on',    0, 9, 37, 70 ],
-        [ 'note_off',   1, 9, 37,  0 ],
-        [ 'note_on',  191, 9, 37, 70 ],
-        [ 'note_off',   1, 9, 37,  0 ],
-        [ 'note_on',  191, 9, 37, 70 ],
-        [ 'note_off',   1, 9, 37,  0 ],
-        [ 'note_on',  191, 9, 37, 70 ],
-        [ 'note_off',   1, 9, 37,  0 ],
       ],
       type => 'MTrk',
     }, 'MIDI::Track' ),

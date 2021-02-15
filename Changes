@@ -2,6 +2,12 @@ Revision history for MIDI-Guitar
 
 0.07
 
+	Allow tracks to be written to separate MIDI files.
+
+	Verify increasing order of pattern elements.
+
+	Explicit finish() is now required.
+
 	Allow play to take a list of string arguments.
 
 	Add "play" option to finish().
