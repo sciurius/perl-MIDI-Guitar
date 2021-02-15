@@ -764,6 +764,17 @@ Writes the piece to this MIDI file.
 
 The filename can also be specified upon initialisation.
 
+=item play
+
+Plays the MIDI through a suitable MIDI player. This can be an array
+with a command line, or a scalar, non-false value. In the latter case
+the program C<midi-play> is used.
+
+    $opus->finish( play => [ "timidity", "-c", "$ENV{HOME}/.timidity.cfg" ] );
+
+If necessary, the MIDI data is written to a temporary file that is
+removed after playing.
+
 =back
 
 Returns the MIDI Opus.
@@ -864,7 +875,26 @@ sub finish {
 				  tracks => \@tracks } );
 
     $opts{file} //= $self->{midi};
-    $opus->write_to_file( $opts{file} ) if $opts{file};
+    my $tmp;
+    if ( $opts{file} ) {
+	$opus->write_to_file( $opts{file} );
+    }
+    elsif ( $opts{play} ) {
+	use File::Temp qw( tempfile );
+	my ( $fh, $filename ) = tempfile();
+	close($fh);
+	$opus->write_to_file( $filename );
+	$opts{file} = $filename;
+	$tmp++;
+    }
+
+    if ( $opts{play} ) {
+	my @cmd = UNIVERSAL::isa($opts{play}, 'ARRAY')
+	  ? @{$opts{play}}
+	  : ( "midi-play" );
+	system( @cmd, $opts{file} );
+	unlink( $opts{file} ) if $tmp;
+    }
 
     delete $self->{events};
 
