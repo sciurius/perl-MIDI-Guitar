@@ -506,9 +506,9 @@ sub strum {
     bless \@pattern => 'MIDI::Guitar::Pattern';
 }
 
-=head2 $opus->play( $pattern => $strings )
+=head2 $opus->play( $pattern => $strings, ... )
 
-Plays a pattern over the strings.
+Plays a pattern over the (series of) strings.
 
 Pattern is the result from an earlier call to pluck(), strum(), or tab().
 
@@ -533,7 +533,7 @@ sub play {
     }
     $self->{cskip} = 0;
 
-    my ( $pattern, $strings ) = @_;
+    my ( $pattern, @strings ) = @_;
 
     # If it is an array of patterns, random select one.
     if ( UNIVERSAL::isa($pattern, 'ARRAY' )
@@ -543,45 +543,50 @@ sub play {
     unless ( UNIVERSAL::isa($pattern, 'MIDI::Guitar::Pattern' ) ) {
 	croak("Pattern required");
     }
-    unless ( UNIVERSAL::isa($strings, 'ARRAY' ) ) {
-	$strings = [ split(' ', $strings) ];
-    }
-    croak("Number of strings must be ".scalar(@{ $self->{root} }))
-      unless @$strings == @{ $self->{root} };
 
-    foreach ( @$pattern ) {
-	# [ measure-offset, [ actions ... ] ]
-	my ( $offset, $actions ) = @$_;
-	my $cclock = $self->{clock} + ( $offset - 1 ) * $self->{tpb};
-	# Randomize clock time.
-	$cclock += ( 1 - rand(2) ) * $self->{rtime} if $self->{rtime};
-	$cclock = 0 if $cclock < 0;
+    for my $strings ( @strings ) {
 
-	# Randomize velocity.
-	my $dv = 0;
-	$dv = ( 1 - rand(2) ) * $self->{rvol} if $self->{rvol};
-
-	foreach ( @$actions ) {
-	    # [ string velocity ]
-	    my ( $str, $vel ) = @$_;
-	    $str = @{ $self->{root} } - $str;
-	    if ( defined $strings->[$str] ) {
-		# Undefined is same as '-' (skip).
-		next if $strings->[$str] eq '-';
-
-		my $note = $self->{root}->[$str] + $strings->[$str];
-		if ( $self->{sounding}->[$str] ) {
-		    $self->note( $cclock, $self->{sounding}->[$str], 0 );
-		}
-		next unless $vel > 0;
-		$self->note( $cclock, $note,
-		      $vel > $self->{rvol} ? $vel + $dv : $vel );
-		$self->{sounding}->[$str] = $vel ? $note : 0;
-	    }
+	unless ( UNIVERSAL::isa($strings, 'ARRAY' ) ) {
+	    $strings = [ split(' ', $strings) ];
 	}
+	croak("Number of strings must be ".scalar(@{ $self->{root} }))
+	  unless @$strings == @{ $self->{root} };
 
+	foreach ( @$pattern ) {
+	    # [ measure-offset, [ actions ... ] ]
+	    my ( $offset, $actions ) = @$_;
+	    my $cclock = $self->{clock} + ( $offset - 1 ) * $self->{tpb};
+	    # Randomize clock time.
+	    $cclock += ( 1 - rand(2) ) * $self->{rtime} if $self->{rtime};
+	    $cclock = 0 if $cclock < 0;
+
+	    # Randomize velocity.
+	    my $dv = 0;
+	    $dv = ( 1 - rand(2) ) * $self->{rvol} if $self->{rvol};
+
+	    foreach ( @$actions ) {
+		# [ string velocity ]
+		my ( $str, $vel ) = @$_;
+		$str = @{ $self->{root} } - $str;
+		if ( defined $strings->[$str] ) {
+		    # Undefined is same as '-' (skip).
+		    next if $strings->[$str] eq '-';
+
+		    my $note = $self->{root}->[$str] + $strings->[$str];
+		    if ( $self->{sounding}->[$str] ) {
+			$self->note( $cclock, $self->{sounding}->[$str], 0 );
+		    }
+		    next unless $vel > 0;
+		    $self->note( $cclock, $note,
+			  $vel > $self->{rvol} ? $vel + $dv : $vel );
+		    $self->{sounding}->[$str] = $vel ? $note : 0;
+		}
+	    }
+
+	}
+	$self->{clock} += $self->{bpm} * $self->{tpb};
     }
-    $self->{clock} += $self->{bpm} * $self->{tpb};
+
     return $self;
 }
 
