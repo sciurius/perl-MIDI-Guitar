@@ -457,6 +457,7 @@ sub strum {
 
     my @pattern;
 
+    my $coff = 0;
     foreach ( @args ) {
 	# time strum actions...
 	my ( $offset, $disp, $actions ) =
@@ -467,6 +468,9 @@ sub strum {
 	     (.*)			# actions
 	     $ }x;
 	croak("Invalid strum pattern: $_") unless defined $offset;
+	croak("Offset out of order in pattern: $_")
+	  if $offset <= $coff;
+	$coff = $offset;
 
 	# Strum displacement is either a float number, or a fraction.
 	$disp = $1/$2 if $disp =~ m;^([-+]?\d+)/(\d+)$;;
@@ -978,11 +982,13 @@ sub time2delta {
     my ( $ev ) = @_;
 
     my $time = 0;		# time until now
+    my $ix = 0;
     foreach my $e ( @$ev ) {
-	croak("NEGATIVE DELTA \@ $time: @{[$e->[EV_TIME]-$time]}\n")
+	croak("NEGATIVE DELTA \@ [$ix] $time: @{[$e->[EV_TIME]-$time]}\n")
 	  if $e->[EV_TIME] < $time;
 	# Make time relative.
 	($time, $e->[EV_TIME]) = ($e->[EV_TIME], $e->[EV_TIME]-$time);
+	$ix++;
     }
 
     # For convenience:
