@@ -518,9 +518,25 @@ Pattern is the result from an earlier call to pluck(), strum(), or tab().
 Pattern may be a reference to an array with patterns. If so, a random
 pattern will be selected from the array.
 
-Strings is a space separated series of finger positions. The strings
+I<Strings> is a space separated series of finger positions. The strings
 are played according to the positions. C<0> indicates an open string,
 C<-> a muted string.
+
+I<Strings> may also be an array with finger positions.
+
+For full power, I<strings> may be an array of arrays, the latter
+containing an I<offset> and a I<string> as described above. The
+I<offset> determines where during the playing of the measure the
+strings are applied.
+
+For example, in a 4/4 measure, apply the pattern to the C chord for
+the first two beats, and to the Am chord starting beat 3:
+
+    [ [ 1, "0 3 2 0 1 0" ], [ 3, [ 0, 0, 2, 2, 1, 0 ] ] ]
+
+A simple string argument "0 3 2 0 1 0" is equivalent to
+
+    [ [ 1, [ 0, 3, 2, 0, 1, 0, ] ] ]
 
 Returns itself.
 
@@ -549,15 +565,45 @@ sub play {
 
     for my $strings ( @strings ) {
 
-	unless ( UNIVERSAL::isa($strings, 'ARRAY' ) ) {
-	    $strings = [ split(' ', $strings) ];
-	}
-	croak("Number of strings must be ".scalar(@{ $self->{root} }))
-	  unless @$strings == @{ $self->{root} };
+	# "s0 s1 .."
+	# [ s0, s1, .. ]
+	# [ [ 1, "s0 s1 .." ], ... ]
+	# [ [ 1, [ s0, s1, .. ] ], ... ]
 
+	my @strsel;
+
+	if ( ref($strings) ne 'ARRAY' ) {
+	    @strsel = ( [ 1, [ split(' ', $strings) ] ] );
+	}
+	elsif ( ref($strings->[0]) ne 'ARRAY' ) {
+	    @strsel = ( [ 1, $strings ] );
+	}
+	else {
+	    foreach my $strings ( @$strings ) {
+		if ( ref($strings->[1]) ne 'ARRAY' ) {
+		    push( @strsel, [ $strings->[0], [ split(' ', $strings->[1]) ] ] );
+		}
+		else {
+		    push( @strsel, $strings );
+		}
+	    }
+	}
+#	use DDumper; DDumper(\@strsel);
+	foreach ( @strsel ) {
+	    croak("Offset must be less than " . (1 + $self->{bpm}))
+	      unless $_->[0] < (1 + $self->{bpm});
+	    croak("Number of strings must be ".scalar(@{ $self->{root} }))
+	      unless @{$_->[1]} == @{ $self->{root} };
+	}
+
+	my $strsel = 0;
+
+	my $px = -1;
 	foreach ( @$pattern ) {
 	    # [ measure-offset, [ actions ... ] ]
 	    my ( $offset, $actions ) = @$_;
+	    $px++;
+
 	    my $cclock = $self->{clock} + ( $offset - 1 ) * $self->{tpb};
 	    # Randomize clock time.
 	    $cclock += ( 1 - rand(2) ) * $self->{rtime} if $self->{rtime};
@@ -566,6 +612,14 @@ sub play {
 	    # Randomize velocity.
 	    my $dv = 0;
 	    $dv = ( 1 - rand(2) ) * $self->{rvol} if $self->{rvol};
+
+	    # Select strings based on the offset.
+	    if ( $strsel < @strsel && $offset >= $strsel[$strsel]->[0] ) {
+		$strings = $strsel[$strsel]->[1];
+#		warn("SB[$px]: @$strings");
+		$strsel++;
+	    }
+#	    warn("P[$px]: @$strings");
 
 	    foreach ( @$actions ) {
 		# [ string velocity ]

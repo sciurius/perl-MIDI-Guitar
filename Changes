@@ -1,6 +1,11 @@
 Revision history for MIDI-Guitar
 
-0.07
+0.08	2021-02-16
+
+	Allow complex string forms to implement in-measure chord
+	changes.
+
+0.07	2021-02-15
 
 	Allow tracks to be written to separate MIDI files.
 

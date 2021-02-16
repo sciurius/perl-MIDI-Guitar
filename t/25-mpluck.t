@@ -1,7 +1,7 @@
 #! perl
 
 use strict;
-use Test::More tests => 4;
+use Test::More tests => 1;
 
 use MIDI::Guitar;
 
@@ -22,11 +22,11 @@ my $ref = bless( {
         [ 'patch_change', 0, 0, 24   ],
         [ 'note_on',    0, 0, 40, 90 ],
         [ 'note_on',  192, 0, 55, 80 ],
-        [ 'note_on',  192, 0, 60, 80 ],
+        [ 'note_on',  192, 0, 59, 80 ],
         [ 'note_on',  192, 0, 64, 90 ],
         [ 'note_off', 192, 0, 40,  0 ],
         [ 'note_off',   0, 0, 55,  0 ],
-        [ 'note_off',   0, 0, 60,  0 ],
+        [ 'note_off',   0, 0, 59,  0 ],
         [ 'note_off',   0, 0, 64,  0 ],
       ],
       type => 'MTrk',
@@ -34,17 +34,8 @@ my $ref = bless( {
   ],
 }, 'MIDI::Opus' );
 
-# Simple strings spec: strings string.
-test( '0 3 2 0 1 0' );
-
-# Simple strings spec: strings array.
-test( [ 0, 3, 2, 0, 1, 0, ] );
-
 # Complex strings spec: offset + strings string.
-test( [ [ 1, "0 3 2 0 1 0" ] ] );
-
-# Complex strings spec: offset + strings array.
-test( [ [ 1, [ 0, 3, 2, 0, 1, 0 ] ] ] );
+test( [ [ 1, "0 3 2 0 1 0" ], [ 3, "0 2 2 1 0 0" ] ] );
 
 ################ Subroutines ################
 
@@ -60,6 +51,6 @@ sub test {
 			     '4.0  1:90' );
 
     $opus->play( $pluck => $chord );
-    $opus = $opus->finish;		# returns MIDI structure.
+    $opus = $opus->finish;
     is_deeply( $opus, $ref );
 }
