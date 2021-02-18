@@ -542,15 +542,12 @@ Returns itself.
 
 =cut
 
+# Play is a user friendly (programmer friendly?) frontend for _play.
+
 sub play {
     my $self = shift;
 
-    unless ( @_ ) {
-	$self->{cskip} += $self->{bpm} * $self->{tpb};
-	$self->{clock} += $self->{bpm} * $self->{tpb};
-	return $self;
-    }
-    $self->{cskip} = 0;
+    return $self->_play unless @_;
 
     my ( $pattern, @strings ) = @_;
 
@@ -563,6 +560,7 @@ sub play {
 	croak("Pattern required");
     }
 
+    my @str;
     for my $strings ( @strings ) {
 
 	# "s0 s1 .."
@@ -588,17 +586,38 @@ sub play {
 		}
 	    }
 	}
-#	use DDumper; DDumper(\@strsel);
 	foreach ( @strsel ) {
 	    croak("Offset must be less than " . (1 + $self->{bpm}))
 	      unless $_->[0] < (1 + $self->{bpm});
 	    croak("Number of strings must be ".scalar(@{ $self->{root} }))
 	      unless @{$_->[1]} == @{ $self->{root} };
 	}
+	push( @str, [ @strsel ] );
+    }
 
+    # use DDumper; DDumper(\@str);
+    $self->_play( $pattern, @str );
+}
+
+# Low level player. Requires validated arguments.
+
+sub _play {
+    my $self = shift;
+
+    unless ( @_ ) {
+	$self->{cskip} += $self->{bpm} * $self->{tpb};
+	$self->{clock} += $self->{bpm} * $self->{tpb};
+	return $self;
+    }
+    $self->{cskip} = 0;
+
+    my ( $pattern, @measures ) = @_;
+
+    for my $measure ( @measures ) {
 	my $strsel = 0;
 
 	my $px = -1;
+	my $strings;
 	foreach ( @$pattern ) {
 	    # [ measure-offset, [ actions ... ] ]
 	    my ( $offset, $actions ) = @$_;
@@ -614,8 +633,8 @@ sub play {
 	    $dv = ( 1 - rand(2) ) * $self->{rvol} if $self->{rvol};
 
 	    # Select strings based on the offset.
-	    if ( $strsel < @strsel && $offset >= $strsel[$strsel]->[0] ) {
-		$strings = $strsel[$strsel]->[1];
+	    if ( $strsel < @$measure && $offset >= $measure->[$strsel]->[0] ) {
+		$strings = $measure->[$strsel]->[1];
 #		warn("SB[$px]: @$strings");
 		$strsel++;
 	    }

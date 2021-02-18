@@ -15,6 +15,8 @@ $opus->play( $strum => $chord );
 
 $opus = $opus->finish;
 
+# use MIDI::Tweaks::Dump; $opus->midi_dump();
+
 my $ref = bless( {
   format => 1,
   ticks => 192,
