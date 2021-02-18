@@ -1,5 +1,7 @@
 Revision history for MIDI-Guitar
 
+	Prevent tempo/rit/finish to be called on aux tracks.
+
 0.08	2021-02-16
 
 	Allow complex string forms to implement in-measure chord

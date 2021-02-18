@@ -797,6 +797,7 @@ Returns itself.
 
 sub tempo {
     my ( $self, $tempo, $cclock ) = @_;
+    croak("tempo() cannot be called on aux tracks.") if $self->{master};
     $cclock //= $self->{clock};
     push( @{ $self->{xtempo} }, [ $cclock, int(60000000/$tempo) ] );
     $self->{bpmin} = $tempo;
@@ -819,6 +820,7 @@ For example, to slow down 100bpm to 60bpm over 3 measures:
 
 sub rit {
     my ( $self, $amt, $bars ) = @_;
+    croak("rit() cannot be called on aux tracks.") if $self->{master};
     my $v0 = $self->{bpmin};
     my $v1 = $amt * $v0;
     my $d = ($v0 - $v1) / ($bars*$self->{bpm});
@@ -867,12 +869,14 @@ removed after playing.
 
 =back
 
-Returns the MIDI Opus.
+Returns the MIDI Opus, if any.
 
 =cut
 
 sub finish {
     my ( $self, %opts ) = @_;
+
+    croak("finish() cannot be called on aux tracks.") if $self->{master};
 
     return unless $self && %$self && defined($self->{events}) && @{$self->{events}};
 
